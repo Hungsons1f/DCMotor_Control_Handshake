@@ -348,9 +348,10 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim)
   
     __HAL_RCC_GPIOE_CLK_ENABLE();
     /**TIM3 GPIO Configuration    
-    PE3     ------> TIM3_CH1 
+    PE3     ------> TIM3_CH1
+    PE4     ------> TIM3_CH2 
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_3;
+    GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
