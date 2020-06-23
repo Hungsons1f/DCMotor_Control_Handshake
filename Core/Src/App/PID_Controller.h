@@ -15,7 +15,7 @@
 //#define  kpmotor 							0.6
 //#define  kimotor 							0//0.3
 //#define  kdmotor 							0//0.075
-#define  time 								0.02
+#define  time 								0.01
 //#define set									1000.0
 
 /* Private variables ---------------------------------------------------------*/

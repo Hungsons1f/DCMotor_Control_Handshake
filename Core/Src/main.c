@@ -61,16 +61,17 @@ TIM_HandleTypeDef htim6;
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
-float InBuffer[2];
+float InBuffer[3];
 uint8_t Buffer[10];
 uint8_t Instruction[5];
 extern uint8_t txack, txnak;
 extern uint8_t rxnak;
 float Float = 18.5;
 uint8_t falsetransmit = 0;
+uint32_t starttick = 0;
 
 /*-------------- GUI Datas-----------*/
-float setpoint = 720;
+float setpoint = 0;
 float realtime = 0;
 float kp = 0;
 float ki = 0;
@@ -112,7 +113,28 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	//if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) != 0)
 	{
 		//TransmitCommand(Measure, 1, Float);
-		falsetransmit ^= 0x01;
+//		falsetransmit ^= 0x01;
+		falsetransmit++;
+		if (falsetransmit ==1)
+		{
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7,GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14,GPIO_PIN_RESET);
+		}
+
+		if (falsetransmit == 2)
+		{
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7,GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14,GPIO_PIN_SET);
+		}
+
+		if (falsetransmit == 3)
+		{
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7,GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14,GPIO_PIN_RESET);
+			falsetransmit = 0;
+		}
+
+
 	}
 }
 
@@ -154,9 +176,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			break;
 		}
 
-		txack = 1; txnak = 0;
-		TransmitAndHandshake(InBuffer, realtime, calibmea, Pwmduty);
+		realtime = (float)((HAL_GetTick() - starttick)/1000.0);
 
+		txack = 1; txnak = 0;
+		if (falsetransmit == 2)
+		{
+			float  b = 522.2, c = 41.3;
+			TransmitData(realtime, b, c);
+		}
+		else
+		{
+			TransmitAndHandshake(InBuffer, realtime, calibmea, Pwmduty);
+		}
 
 		//HAL_TIM_Base_Stop(&htim5);
 		//uint32_t gettime = __HAL_TIM_GET_COUNTER(&htim5);
@@ -166,6 +197,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	if (__HAL_TIM_GET_IT_SOURCE(&htim6,TIM_IT_UPDATE))
 	{
+//		HAL_TIM_Base_Start(&htim5);
 		float calibmea = 0;
 		switch (Motormode)
 		{
@@ -179,6 +211,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			break;
 		}
 		TransmitAndHandshake(InBuffer, realtime, calibmea, Pwmduty);
+//		HAL_TIM_Base_Stop(&htim5);
+//		uint32_t gettime = __HAL_TIM_GET_COUNTER(&htim5);
+//		__HAL_TIM_SET_COUNTER(&htim5,0);
+
 	}
 }
 
@@ -198,11 +234,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		return;
 	}
 
-	if (!falsetransmit)
-	{
-		ReceiveAndHandshake(Buffer, Instruction);
-	}
-	else
+	if (falsetransmit == 1)
 	{
 		uint8_t nak = Nak, stx = STX, etx = ETX;
 		uint8_t dummy[4] = {1,0,0,0};
@@ -211,172 +243,178 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		HAL_UART_Transmit(&hlpuart1, dummy, 4, 1000);
 		HAL_UART_Transmit(&hlpuart1, &etx, 1, 1000);
 	}
+	else
+	{
+		ReceiveAndHandshake(Buffer, Instruction);
+	}
 	//EchoReceived(Buffer);
 
-//
-//	switch (*Instruction)
-//	{
-//	case Run:
-//		if (Motorstatus == Stopped)
-//		{
-//			Pwmduty = 0;
-//			ClearEncoderCount(&htim2);
-//			ClearPIDController();
-//
-//			HAL_TIM_Base_Start_IT(&htim4);
-//			HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_1);
-//			HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-//
-//			Motorstatus = Running;
-//
-//		}
-//		break;
-//	case Stop:
-//		if (Motorstatus == Running)
-//		{
-//			HAL_TIM_Base_Stop_IT(&htim4);
-//			HAL_TIM_Encoder_Stop(&htim2, TIM_CHANNEL_1);
-//			HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
-//
-//			Motorstatus = Stopped;
-//		}
-//		break;
-//	case Velocity:
-//		if (Motorstatus == Stopped)
-//		{
-//			Motormode = Vec;
-//		}
-//		break;
-//	case Position:
-//		if (Motorstatus == Stopped)
-//		{
-//			Motormode = Pos;
-//		}
-//		break;
-//	case ctrlSetpoint:
-//		{
-//			float calibset = 0;
-//			switch (Motormode)
-//			{
-//			case Vec:
-//				setpoint = /*(6.0/5.0)**/ gainv* ReceiveDataofHeader(Instruction);
-//				calibset = setpoint/gainv;//*(5.0/6.0);
-//				break;
-//			case Pos:
-//				setpoint = /*(40.0)**/ gainp*ReceiveDataofHeader(Instruction);
-//				calibset = setpoint/gainp;   ///40.0;
-//				break;
-//			default:
-//				break;
-//			}
-//		}
-//		break;
-//	case ctrlRealtime:
-//		//if (Motorstatus == Stopped)
-//		{
-//			//realtime = ReceiveDataofHeader(Buffer);
-//			//TransmitWithHeader(Realtime, 0);
-//		}
-//		break;
-//	case Kp:
-//		if (Motorstatus == Stopped)
-//		{
-//			kp = ReceiveDataofHeader(Instruction);
-//		}
-//		break;
-//	case Ki:
-//		if (Motorstatus == Stopped)
-//		{
-//			ki = ReceiveDataofHeader(Instruction);
-//		}
-//		break;
-//	case Kd:
-//		if (Motorstatus == Stopped)
-//		{
-//			kd = ReceiveDataofHeader(Instruction);
-//		}
-//		break;
-//	//case Request:
-//		/*if (Motorstatus == Stopped)
-//		{
-//			uint32_t ii = 0;
-//			uint8_t message[][20] = {
-//					"Set Point = ",
-//					"Time Step = ",
-//					"Calib Vec Coef = ",
-//					"Calib Pos Coef = ",
-//					"Kp = ",
-//					"Ki = ",
-//					"Kd = ",
-//					"Alpha = ",
-//					"Beta = "
-//			};
-//			for (ii = 0; ii< sizeof(message[0]); ii++)
-//			{
-//				TransmitWithHeader(Message, message[0][ii]);
-//			}
-//			TransmitWithHeader(Floattype, setpoint);
-//			for (ii = 0; ii< sizeof(message[1]); ii++)
-//			{
-//				TransmitWithHeader(Message, message[1][ii]);
-//			}
-//			TransmitWithHeader(Floattype, (float)time);
-//			for (ii = 0; ii< sizeof(message[2]); ii++)
-//			{
-//				TransmitWithHeader(Message, message[2][ii]);
-//			}
-//			TransmitWithHeader(Floattype, gainv);
-//			for (ii = 0; ii< sizeof(message[3]); ii++)
-//			{
-//				TransmitWithHeader(Message, message[3][ii]);
-//			}
-//			TransmitWithHeader(Floattype, gainp);
-//			for (ii = 0; ii< sizeof(message[4]); ii++)
-//			{
-//				TransmitWithHeader(Message, message[4][ii]);
-//			}
-//			TransmitWithHeader(Floattype, kp);
-//			for (ii = 0; ii< sizeof(message[5]); ii++)
-//			{
-//				TransmitWithHeader(Message, message[5][ii]);
-//			}
-//			TransmitWithHeader(Floattype, ki);
-//			for (ii = 0; ii< sizeof(message[6]); ii++)
-//			{
-//				TransmitWithHeader(Message, message[6][ii]);
-//			}
-//			TransmitWithHeader(Floattype, kd);
-//			for (ii = 0; ii< sizeof(message[7]); ii++)
-//			{
-//				TransmitWithHeader(Message, message[7][ii]);
-//			}
-//
-//			uint32_t it = 50;
-//			for (it = 0; it<= 200; it++)
-//			{
-//				TransmitWithHeader(0x00, 0);
-//			}
-//
-//		}
-//		break;*/
-//	case Calib:
-//		if (Motorstatus == Stopped)
-//		{
-//			switch (Motormode)
-//			{
-//			case Vec:
-//				gainv = ReceiveDataofHeader(Instruction);
-//				break;
-//			case Pos:
-//				gainp = ReceiveDataofHeader(Instruction);
-//				break;
-//			default:
-//				break;
-//			}
-//		}
-//		break;
-//	}
+
+	switch (*Instruction)
+	{
+	case Run:
+		if (Motorstatus == Stopped)
+		{
+			Pwmduty = 0;
+			ClearEncoderCount(&htim2);
+			ClearPIDController();
+
+			HAL_TIM_Base_Start_IT(&htim4);
+			HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_1);
+			HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+			starttick = HAL_GetTick();
+			Motorstatus = Running;
+
+		}
+		break;
+	case Stop:
+		if (Motorstatus == Running)
+		{
+			HAL_TIM_Base_Stop_IT(&htim4);
+			HAL_TIM_Encoder_Stop(&htim2, TIM_CHANNEL_1);
+			HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
+
+			Motorstatus = Stopped;
+		}
+		break;
+	case Velocity:
+		if (Motorstatus == Stopped)
+		{
+			Motormode = Vec;
+		}
+		break;
+	case Position:
+		if (Motorstatus == Stopped)
+		{
+			Motormode = Pos;
+		}
+		break;
+	case ctrlSetpoint:
+		{
+			float calibset = 0;
+			switch (Motormode)
+			{
+			case Vec:
+				setpoint = /*(6.0/5.0)**/ gainv* ReceiveDataofHeader(Instruction);
+				calibset = setpoint/gainv;//*(5.0/6.0);
+				break;
+			case Pos:
+				setpoint = /*(40.0)**/ gainp*ReceiveDataofHeader(Instruction);
+				calibset = setpoint/gainp;   ///40.0;
+				break;
+			default:
+				break;
+			}
+		}
+		break;
+	case ctrlRealtime:
+		//if (Motorstatus == Stopped)
+		{
+			//realtime = ReceiveDataofHeader(Buffer);
+			//TransmitWithHeader(Realtime, 0);
+		}
+		break;
+	case Kp:
+		if (Motorstatus == Stopped)
+		{
+			kp = ReceiveDataofHeader(Instruction);
+		}
+		break;
+	case Ki:
+		if (Motorstatus == Stopped)
+		{
+			ki = ReceiveDataofHeader(Instruction);
+		}
+		break;
+	case Kd:
+		if (Motorstatus == Stopped)
+		{
+			kd = ReceiveDataofHeader(Instruction);
+		}
+		break;
+	//case Request:
+		/*if (Motorstatus == Stopped)
+		{
+			uint32_t ii = 0;
+			uint8_t message[][20] = {
+					"Set Point = ",
+					"Time Step = ",
+					"Calib Vec Coef = ",
+					"Calib Pos Coef = ",
+					"Kp = ",
+					"Ki = ",
+					"Kd = ",
+					"Alpha = ",
+					"Beta = "
+			};
+			for (ii = 0; ii< sizeof(message[0]); ii++)
+			{
+				TransmitWithHeader(Message, message[0][ii]);
+			}
+			TransmitWithHeader(Floattype, setpoint);
+			for (ii = 0; ii< sizeof(message[1]); ii++)
+			{
+				TransmitWithHeader(Message, message[1][ii]);
+			}
+			TransmitWithHeader(Floattype, (float)time);
+			for (ii = 0; ii< sizeof(message[2]); ii++)
+			{
+				TransmitWithHeader(Message, message[2][ii]);
+			}
+			TransmitWithHeader(Floattype, gainv);
+			for (ii = 0; ii< sizeof(message[3]); ii++)
+			{
+				TransmitWithHeader(Message, message[3][ii]);
+			}
+			TransmitWithHeader(Floattype, gainp);
+			for (ii = 0; ii< sizeof(message[4]); ii++)
+			{
+				TransmitWithHeader(Message, message[4][ii]);
+			}
+			TransmitWithHeader(Floattype, kp);
+			for (ii = 0; ii< sizeof(message[5]); ii++)
+			{
+				TransmitWithHeader(Message, message[5][ii]);
+			}
+			TransmitWithHeader(Floattype, ki);
+			for (ii = 0; ii< sizeof(message[6]); ii++)
+			{
+				TransmitWithHeader(Message, message[6][ii]);
+			}
+			TransmitWithHeader(Floattype, kd);
+			for (ii = 0; ii< sizeof(message[7]); ii++)
+			{
+				TransmitWithHeader(Message, message[7][ii]);
+			}
+
+			uint32_t it = 50;
+			for (it = 0; it<= 200; it++)
+			{
+				TransmitWithHeader(0x00, 0);
+			}
+
+		}
+		break;*/
+	case Calib:
+		if (Motorstatus == Stopped)
+		{
+			switch (Motormode)
+			{
+			case Vec:
+				gainv = ReceiveDataofHeader(Instruction);
+				break;
+			case Pos:
+				gainp = ReceiveDataofHeader(Instruction);
+				break;
+			default:
+				break;
+			}
+		}
+		break;
+	}
+
 	HAL_UART_Receive_IT(&hlpuart1, Buffer, 7);
+
 }
 /* USER CODE END 0 */
 
@@ -564,7 +602,7 @@ static void MX_USART1_UART_Init(void)
   huart1.Instance = USART1;
   huart1.Init.BaudRate = 115200;
   huart1.Init.WordLength = UART_WORDLENGTH_9B;
-  huart1.Init.StopBits = UART_STOPBITS_2;
+  huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_ODD;
   huart1.Init.Mode = UART_MODE_TX_RX;
   huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
@@ -771,7 +809,7 @@ static void MX_TIM4_Init(void)
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 39;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 1999;
+  htim4.Init.Period = 999;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
@@ -860,7 +898,7 @@ static void MX_TIM6_Init(void)
   htim6.Instance = TIM6;
   htim6.Init.Prescaler = 39;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 799;
+  htim6.Init.Period = 499;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {

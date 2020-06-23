@@ -19,7 +19,7 @@ enum ControlHeader	{Run = 0x11, Stop = 0x12, Velocity = 0x13, Position = 0x14, c
 						Kp = 0x17, Ki = 0x18, Kd = 0x19,
 						Calib = 0x31,
 						Nak = 0xF0, Ack = 0xF1};
-enum FrameHeader  {STX = 0xFE, ETX = 0xFF, DLE = 0xFD};
+enum FrameHeader  {STX = 0xFE, ETX = 0xFF, STX16 = 0xFD};
 
 /* Private variables ---------------------------------------------------------*/
 

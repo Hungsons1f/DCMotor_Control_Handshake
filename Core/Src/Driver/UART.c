@@ -31,7 +31,7 @@ uint8_t rxnak = 0;
 /* Private function -----------------------------------------------*/
 void TransmitCommand (uint8_t command, uint8_t haveData, float data)
 {
-	uint8_t stx = STX, etx = ETX, dle = DLE, sum = 2;
+	uint8_t stx = STX, etx = ETX, dle = STX16, sum = 2;
 	HAL_UART_Transmit(&hlpuart1, &stx, 1, 1000);
 	HAL_UART_Transmit(&hlpuart1, &command, 1, 1000);
 	if (haveData != 0)
@@ -58,7 +58,7 @@ void TransmitCommand (uint8_t command, uint8_t haveData, float data)
 
 void TransmitDataOrigin (float realtime, float measure)
 {
-	uint8_t stx = STX, etx = ETX, dle = DLE, head = Data, sum = 10;
+	uint8_t stx = STX, etx = ETX, dle = STX16, head = Data, sum = 10;
 	uint8_t *temp;
 	HAL_UART_Transmit(&hlpuart1, &stx, 1, 1000);
 	HAL_UART_Transmit(&hlpuart1, &head, 1, 1000);
@@ -94,7 +94,7 @@ void TransmitDataOrigin (float realtime, float measure)
 
 void TransmitData (float realtime, float measure, float pwm)
 {
-	uint8_t stx = STX, etx = ETX, head = Data;
+	uint8_t stx = STX16, etx = ETX, head = Data;
 	uint8_t *temp;
 	HAL_UART_Transmit(&hlpuart1, &stx, 1, 1000);
 	HAL_UART_Transmit(&hlpuart1, &head, 1, 1000);
@@ -106,6 +106,17 @@ void TransmitData (float realtime, float measure, float pwm)
 	HAL_UART_Transmit(&hlpuart1, temp, 4, 1000);
 	HAL_UART_Transmit(&hlpuart1, &txindex, 1, 1000);
 	HAL_UART_Transmit(&hlpuart1, &etx, 1, 1000);
+
+//	HAL_UART_Transmit(&huart1, &stx, 1, 1000);
+//	HAL_UART_Transmit(&huart1, &head, 1, 1000);
+//	temp = Float2Char(realtime);
+//	HAL_UART_Transmit(&huart1, temp, 4, 1000);
+//	temp = Float2Char(measure);
+//	HAL_UART_Transmit(&huart1, temp, 4, 1000);
+//	temp = Float2Char(pwm);
+//	HAL_UART_Transmit(&huart1, temp, 4, 1000);
+//	HAL_UART_Transmit(&huart1, &txindex, 1, 1000);
+//	HAL_UART_Transmit(&huart1, &etx, 1, 1000);
 }
 
 /**
@@ -136,8 +147,8 @@ uint8_t TransmitAndHandshake (float *buffer, float realtime, float measure, floa
 		*(buffer+2) = pwm;
 		txack = 0;
 
-		__HAL_TIM_SET_COUNTER(&htim6, 0);
-		HAL_TIM_Base_Start_IT(&htim6);
+//		__HAL_TIM_SET_COUNTER(&htim6, 0);
+//		HAL_TIM_Base_Start_IT(&htim6);
 		return 1;
 	}
 }
@@ -177,7 +188,7 @@ uint8_t ReceiveAndHandshakeOrigin (uint8_t *buffer, uint8_t *instruction)
 		{
 //			Kiểm tra byte trước đó có phải là DLE không. Nếu đúng thì xóa byte DLE đi, thay bằng ETX
 //			và tiếp tục đọc gói tin
-			if (rxbytefield[rxindex-1] == DLE)
+			if (rxbytefield[rxindex-1] == STX16)
 			{
 				rxbytefield[rxindex-1] = *buffer;
 			}
